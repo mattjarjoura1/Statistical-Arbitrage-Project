@@ -1,0 +1,7 @@
+pandas>=2.0.0
+numpy>=1.24.0
+yfinance>=0.2.0    # For free Data V1
+statsmodels>=0.14.0 # For Cointegration (ADF Test)
+scipy>=1.10.0      # For Z-Score/Stats
+matplotlib>=3.7.0  # For plotting
+jupyter>=1.0.0     # For the lab

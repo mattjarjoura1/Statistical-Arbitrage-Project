@@ -11,9 +11,9 @@ PAIRS = [
 ]
 
 # 2. Data Settings
-START_DATE = "2024-06-01"
-END_DATE = "2025-01-01"
-INTERVAL = "1h"  # "1d" for daily, "1h" for hourly
+START_DATE = "2023-01-01"
+END_DATE = "2024-01-01"
+INTERVAL = "1d"  # "1d" for daily, "1h" for hourly
 
 # 3. Strategy Parameters
 Z_SCORE_WINDOW = 30   # Lookback period for moving average

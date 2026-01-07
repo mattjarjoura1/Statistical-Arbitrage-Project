@@ -24,7 +24,7 @@ class DataAligner:
         """
         # 1. Create a DataFrame with the two inputs
         # The 'outer' join creates the Union of all timestamps
-        df = pd.DataFrame({series_a.name: series_a, series_b.name: series_b})
+        df = pd.DataFrame({'asset_a': series_a, 'asset_b': series_b})
         
         # 2. Sort index to ensure time flows linearly (Critical for backtesting)
         df = df.sort_index()

@@ -1,61 +1,80 @@
 import asyncio
 import json
 import websockets
-from datetime import datetime
+# Import the type hint for the Blackboard (assuming it is in src.shared.state)
+from src.shared.state import Blackboard
 
 class BinanceStream:
-    def __init__(self):
+    """
+    Responsibility: Connect to Binance WebSocket, filter for relevant trades, 
+    and write the 'Latest Truth' to the Blackboard.
+    
+    This is a 'Producer' in the Producer-Consumer pattern.
+    """
+    def __init__(self, blackboard: Blackboard, symbol_a: str, symbol_b: str):
         self.url = "wss://stream.binance.com:9443/ws"
-        self.prices = {"BTCUSDT": None, "ETHUSDT": None}
-        self.hedge_ratio = 14.5  # Hardcoded 'Vibe' Beta for tonight
+        self.blackboard = blackboard
+        
+        # Store symbols in lower case as required by Binance API (e.g. 'btcusdt')
+        self.symbol_a = symbol_a.lower() 
+        self.symbol_b = symbol_b.lower()
+        
+        # Internal Cache (Buffer)
+        # We need this because WebSocket messages arrive for ONE symbol at a time.
+        # We only push to the blackboard when we have a valid price for BOTH.
+        self.prices = {self.symbol_a: None, self.symbol_b: None}
 
     async def connect(self):
-        print(f"[SYSTEM] Connecting to {self.url}...")
+        print(f"[SENSOR] Connecting to Binance Stream for {self.symbol_a} & {self.symbol_b}...")
+        
         async with websockets.connect(self.url) as websocket:
-            # 1. Subscribe to streams
+            # 1. Subscribe to the streams
             subscribe_msg = {
                 "method": "SUBSCRIBE",
-                "params": ["btcusdt@trade", "ethusdt@trade"],
+                "params": [f"{self.symbol_a}@trade", f"{self.symbol_b}@trade"],
                 "id": 1
             }
             await websocket.send(json.dumps(subscribe_msg))
-            print("[SYSTEM] Subscribed to BTC & ETH feeds.")
+            print("[SENSOR] Subscribed. Streaming data to Blackboard...")
 
-            # 2. Event Loop
+            # 2. Event Loop (Infinite)
             while True:
-                message = await websocket.recv()
-                data = json.loads(message)
-                
-                # Check if it's a trade message (ignore heartbeats)
-                if 'e' in data and data['e'] == 'trade':
-                    symbol = data['s']
-                    price = float(data['p'])
+                try:
+                    message = await websocket.recv()
+                    data = json.loads(message)
                     
-                    # Update Cache
-                    self.prices[symbol] = price
-                    
-                    # 3. The "Alignment" Check
-                    if self.prices["BTCUSDT"] and self.prices["ETHUSDT"]:
-                        self.process_tick()
+                    # Filter: specific 'trade' events only
+                    if 'e' in data and data['e'] == 'trade':
+                        self._process_message(data)
+                        
+                except Exception as e:
+                    print(f"[SENSOR] Error in stream: {e}")
+                    # In a real production system, you would add reconnection logic here.
+                    await asyncio.sleep(5) 
 
-    def process_tick(self):
-        btc = self.prices["BTCUSDT"]
-        eth = self.prices["ETHUSDT"]
+    def _process_message(self, data: dict):
+        """
+        Parses the JSON and updates the shared state.
+        """
+        symbol = data['s'].lower()
+        price = float(data['p'])
         
-        # Calculate the 'Live' Spread
-        # Spread = BTC - (Beta * ETH)
-        spread = btc - (self.hedge_ratio * eth)
+        # Binance timestamps are in milliseconds, convert to seconds
+        event_time = data['E'] / 1000.0 
         
-        # Get timestamp
-        now = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        # Update Internal Buffer
+        self.prices[symbol] = price
         
-        # Print the 'Heartbeat' of the market
-        print(f"[{now}] BTC: {btc:.2f} | ETH: {eth:.2f} | SPREAD: {spread:.2f}")
-
-# Boilerplate to run async code
-if __name__ == "__main__":
-    stream = BinanceStream()
-    try:
-        asyncio.run(stream.connect())
-    except KeyboardInterrupt:
-        print("\n[SYSTEM] Disconnected.")
+        # CHECK: Do we have both prices?
+        if self.prices[self.symbol_a] and self.prices[self.symbol_b]:
+            
+            # ASYNC WRITE: Update the shared memory
+            # Note: We use asyncio.create_task to fire-and-forget this update 
+            # so we don't block the websocket loop waiting for the lock.
+            asyncio.create_task(
+                self.blackboard.update_prices(
+                    price_a=self.prices[self.symbol_a],
+                    price_b=self.prices[self.symbol_b],
+                    timestamp=event_time
+                )
+            )

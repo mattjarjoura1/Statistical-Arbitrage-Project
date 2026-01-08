@@ -6,3 +6,7 @@ scipy>=1.10.0      # For Z-Score/Stats
 matplotlib>=3.7.0  # For plotting
 jupyter>=1.0.0     # For the lab
 websockets>=11.0
+gymnasium>=0.28.0
+shimmy
+tensorboard
+stable-baselines3[extra]

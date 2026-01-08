@@ -2,3 +2,12 @@ venv/
 
 repo_structure.txt
 Makefile
+
+data/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python

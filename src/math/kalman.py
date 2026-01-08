@@ -60,6 +60,7 @@ class KalmanFilter:
         expected_price_a = np.dot(H, self.state)
         error = price_a - expected_price_a
         
+    
         # Calculate System Uncertainty (S)
         # S = H * P * H_transpose + R
         S = np.dot(H, np.dot(self.P, H.T)) + self.R
@@ -79,4 +80,4 @@ class KalmanFilter:
         self.P = (np.eye(2) - np.outer(K, H)) @ self.P
         
         # Return just the Beta (the first element of the state)
-        return self.state[0]
+        return self.state[0], error
